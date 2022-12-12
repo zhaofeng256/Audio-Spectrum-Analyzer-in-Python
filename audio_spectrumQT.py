@@ -11,8 +11,8 @@ from PyQt5.QtCore import QTimer
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
-DELAY = 20
-CHUNK = 2048
+DELAY = 50
+CHUNK = 5120
 
 
 class WinForm(QWidget):
@@ -38,8 +38,8 @@ class WinForm(QWidget):
         self.waveform.showGrid(x=True, y=True, alpha=1)
 
         self.spectrum.setLogMode(x=True, y=False)
-        self.spectrum.setYRange(0, 100)
-        self.spectrum.setXRange(np.log10(10), np.log10(22050))
+        self.spectrum.setYRange(-20, 100)
+        self.spectrum.setXRange(np.log10(20), np.log10(22050))
         self.spectrum.showGrid(x=True, y=True, alpha=1)
 
         self.wv_x_axis = self.waveform.getAxis("bottom")
@@ -55,7 +55,7 @@ class WinForm(QWidget):
         self.sp_y_axis.setStyle(tickAlpha=0.5)
 
         sp_x_labels = [
-            (np.log10(10), "10"),
+            (np.log10(15), "15"),
             (np.log10(31), "31"),
             (np.log10(62), "62"),
             (np.log10(125), "125"),
@@ -66,11 +66,13 @@ class WinForm(QWidget):
             (np.log10(4000), "4k"),
             (np.log10(8000), "8k"),
             (np.log10(16000), "16k"),
-            (np.log10(22050), "22k"),
         ]
 
         self.sp_x_axis.setTicks([sp_x_labels])
-        self.sp_x_axis.setLabel("Frequency [Hz]")
+        self.sp_x_axis.setLabel("Frequency", units='HZ')
+
+        self.waveform.setTitle("waveform")
+        self.spectrum.setTitle("spectrum")
 
 class AudioStream:
     def __init__(self, m=0):
@@ -105,11 +107,21 @@ class AudioStream:
 
         self.f = np.fft.fftfreq(cnt, 1.0 / RATE)
         self.f = np.fft.fftshift(self.f)
-        sp_data = np.abs(np.fft.fft(shorts) / (CHUNK / 2))
+        sp_data = np.abs((1.0 / cnt) * np.fft.fft(shorts))
         sp_data = np.fft.fftshift(sp_data)
         sp_data[sp_data == 0] = 1
         sp_data = 20 * np.log10(sp_data)
+
+        v_max = np.amax(sp_data)
+        line_max_x = np.fft.fftfreq(cnt, 1.0 / RATE)
+        line_max_y = np.linspace(v_max, v_max, cnt)
+        
         self.m.spectrum.plot(self.f, sp_data, pen='m', clear=True)
+        self.m.spectrum.plot(line_max_x, line_max_y, pen='g', clear=False)
+
+        txt_tyle = {'color': '#0F0', 'font-size': '14pt'}
+        txt = "max:{:.0f}".format(v_max)
+        self.m.sp_y_axis.setLabel(txt, **txt_tyle)
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.timer.stop()
