@@ -35,10 +35,24 @@ class WinForm(QWidget):
 
         self.waveform.setYRange(-5000, 5000)
         self.waveform.setXRange(0, CHUNK)
+        self.waveform.showGrid(x=True, y=True, alpha=1)
 
         self.spectrum.setLogMode(x=True, y=False)
         self.spectrum.setYRange(0, 100)
         self.spectrum.setXRange(np.log10(10), np.log10(22050))
+        self.spectrum.showGrid(x=True, y=True, alpha=1)
+
+        self.wv_x_axis = self.waveform.getAxis("bottom")
+        self.wv_x_axis.setStyle(tickAlpha=0.5)
+
+        self.wv_y_axis = self.spectrum.getAxis("left")
+        self.wv_y_axis.setStyle(tickAlpha=0.5)
+
+        self.sp_x_axis = self.spectrum.getAxis("bottom")
+        self.sp_x_axis.setStyle(tickAlpha=0.5)
+
+        self.sp_y_axis = self.spectrum.getAxis("left")
+        self.sp_y_axis.setStyle(tickAlpha=0.5)
 
         sp_x_labels = [
             (np.log10(10), "10"),
@@ -55,14 +69,11 @@ class WinForm(QWidget):
             (np.log10(22050), "22k"),
         ]
 
-        self.sp_x_axis = self.spectrum.getAxis("bottom")
         self.sp_x_axis.setTicks([sp_x_labels])
         self.sp_x_axis.setLabel("Frequency [Hz]")
 
-
 class AudioStream:
-    def __init__(self, m):
-        self.m = m
+    def __init__(self, m=0):
         self.p = pyaudio.PyAudio()
 
         try:
@@ -107,10 +118,10 @@ class AudioStream:
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    mwd = WinForm()
-    mwd.show()
-    a = AudioStream(mwd)
+    a = AudioStream()
     if hasattr (a, 'stream'):
+        a.m = WinForm()
+        a.m.show()
         sys.exit(app.exec_())
     else:
         app.exit()
