@@ -64,14 +64,19 @@ class AudioStream:
     def __init__(self, m):
         self.m = m
         self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(
-            format=FORMAT,
-            channels=CHANNELS,
-            rate=RATE,
-            input=True,
-            output=True,
-            frames_per_buffer=CHUNK,
-        )
+
+        try:
+            self.stream = self.p.open(
+                format=FORMAT,
+                channels=CHANNELS,
+                rate=RATE,
+                input=True,
+                output=True,
+                frames_per_buffer=CHUNK,
+            )
+        except Exception as e:
+            print('open microphone failed!\nError:', e)
+            return
 
         self.x = np.arange(0, CHUNK)
         self.f = np.linspace(0, 22050, CHUNK)
@@ -105,7 +110,11 @@ def main():
     mwd = WinForm()
     mwd.show()
     a = AudioStream(mwd)
-    sys.exit(app.exec_())
+    if hasattr (a, 'stream'):
+        sys.exit(app.exec_())
+    else:
+        app.exit()
+        sys.exit()
 
 
 if __name__ == "__main__":
