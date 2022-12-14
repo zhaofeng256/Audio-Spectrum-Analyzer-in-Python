@@ -1,3 +1,4 @@
+import audioop
 import sys
 import struct
 import pyaudio
@@ -7,12 +8,13 @@ from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout
 from PyQt5.QtCore import QTimer
 
-
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
+FREQ_MAX = RATE // 2
+FREQ_MIN = 20
+CHUNK = 2 * RATE // FREQ_MIN
 DELAY = 50
-CHUNK = 5120
 
 
 class WinForm(QWidget):
@@ -38,8 +40,8 @@ class WinForm(QWidget):
         self.waveform.showGrid(x=True, y=True, alpha=1)
 
         self.spectrum.setLogMode(x=True, y=False)
-        self.spectrum.setYRange(-20, 100)
-        self.spectrum.setXRange(np.log10(20), np.log10(22050))
+        self.spectrum.setYRange(-100, 1000)
+        self.spectrum.setXRange(np.log10(FREQ_MIN), np.log10(FREQ_MAX))
         self.spectrum.showGrid(x=True, y=True, alpha=1)
 
         self.wv_x_axis = self.waveform.getAxis("bottom")
@@ -69,10 +71,14 @@ class WinForm(QWidget):
         ]
 
         self.sp_x_axis.setTicks([sp_x_labels])
-        self.sp_x_axis.setLabel("Frequency", units='HZ')
+        self.sp_x_axis.setLabel("Frequency ", units="HZ")
 
         self.waveform.setTitle("waveform")
         self.spectrum.setTitle("spectrum")
+
+        self.wv_tyle = {"color": "#FF0", "font-size": "20pt"}
+        self.sp_tyle = {"color": "#0F0", "font-size": "20pt"}
+
 
 class AudioStream:
     def __init__(self, m=0):
@@ -88,7 +94,7 @@ class AudioStream:
                 frames_per_buffer=CHUNK,
             )
         except Exception as e:
-            print('open microphone failed!\nError:', e)
+            print("open microphone failed!\nError:", e)
             return
 
         self.x = np.arange(0, CHUNK)
@@ -103,25 +109,27 @@ class AudioStream:
         cnt = len(wf_data) // 2
         fmt = "%dh" % cnt
         shorts = struct.unpack(fmt, wf_data)
-        self.m.waveform.plot(self.x, shorts, pen='c', clear=True)
+        self.m.waveform.plot(self.x, shorts, pen="c", clear=True)
+
+        v_rms = audioop.rms(wf_data, 2)
+        line_vms_y = np.linspace(v_rms, v_rms, cnt)
+        self.m.waveform.plot(self.x, line_vms_y, pen="y", clear=False)
 
         self.f = np.fft.fftfreq(cnt, 1.0 / RATE)
         self.f = np.fft.fftshift(self.f)
         sp_data = np.abs((1.0 / cnt) * np.fft.fft(shorts))
         sp_data = np.fft.fftshift(sp_data)
-        sp_data[sp_data == 0] = 1
-        sp_data = 20 * np.log10(sp_data)
 
         v_max = np.amax(sp_data)
         line_max_x = np.fft.fftfreq(cnt, 1.0 / RATE)
         line_max_y = np.linspace(v_max, v_max, cnt)
-        
-        self.m.spectrum.plot(self.f, sp_data, pen='m', clear=True)
-        self.m.spectrum.plot(line_max_x, line_max_y, pen='g', clear=False)
 
-        txt_tyle = {'color': '#0F0', 'font-size': '14pt'}
-        txt = "max:{:.0f}".format(v_max)
-        self.m.sp_y_axis.setLabel(txt, **txt_tyle)
+        self.m.spectrum.plot(self.f, sp_data, pen="m", clear=True)
+        self.m.spectrum.plot(line_max_x, line_max_y, pen="g", clear=False)
+
+        rms = 20 * np.log10(v_rms) if v_rms else 0
+        self.m.wv_x_axis.setLabel("RMS:{:.0f}dB".format(rms), **self.m.wv_tyle)
+        self.m.sp_x_axis.setLabel("MAX:{:.0f}".format(v_max), **self.m.sp_tyle)
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.timer.stop()
@@ -131,7 +139,7 @@ class AudioStream:
 def main():
     app = QtWidgets.QApplication(sys.argv)
     a = AudioStream()
-    if hasattr (a, 'stream'):
+    if hasattr(a, "stream"):
         a.m = WinForm()
         a.m.show()
         sys.exit(app.exec_())
